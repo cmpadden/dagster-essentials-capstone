@@ -5,7 +5,10 @@ setup(
     packages=find_packages(exclude=["dagster_essentials_capstone_tests"]),
     install_requires=[
         "dagster",
-        "dagster-cloud"
+        "dagster-cloud",
+        "dagster-duckdb",
+        "requests",
+        "pandas",
     ],
-    extras_require={"dev": ["dagster-webserver", "pytest"]},
+    extras_require={"dev": ["dagster-webserver", "pytest", "ruff", "isort"]},
 )

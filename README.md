@@ -41,6 +41,15 @@ If you want to enable Dagster [Schedules](https://docs.dagster.io/concepts/parti
 
 Once your Dagster Daemon is running, you can start turning on schedules and sensors for your jobs.
 
+### Exploring DuckDB
+
+Using the DuckDB CLI, it is possible to easily explore the contents of the local DuckDB
+by running the command:
+
+```sh
+duckdb data/data.duckdb
+```
+
 ## Deploy on Dagster Cloud
 
 The easiest way to deploy your Dagster project is to use Dagster Cloud.
