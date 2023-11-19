@@ -3,6 +3,13 @@
 The Letterboxd API (https://letterboxd.com/api-beta/) is currently in private beta,
 therefore, we will have to scrape the website the ol' fashioned way.
 
+TODO
+    - https://letterboxd.com/csi/film/parasite-2019/rating-histogram/
+    - explore using a requests.Session resource
+    - only scrape film details for films not existing in details table
+    - better handling of request timeouts or failures (though haven't none have occurred so far)
+    - write structs / lists to duckdb (eg. stats is currently varchar)
+
 """
 import pandas as pd
 import requests
@@ -25,6 +32,10 @@ LETTERBOXD_REQUEST_HEADERS = {
     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
     "X-Requested-With": "XMLHttpRequest",
 }
+
+
+DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS = "letterboxd_popular_films"
+DUCKDB_TABLE_LETTERBOXD_FILMS_DETAILS = "letterboxd_film_details"
 
 
 @asset
@@ -94,4 +105,105 @@ def letterboxd_popular_films(database: DuckDBResource):
     df["snapshot_ts"] = pd.Timestamp.now()
 
     with database.get_connection() as conn:
-        df.to_sql("letterboxd_popular_films", conn, index=False, if_exists="append")
+        df.to_sql(
+            DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS, conn, index=False, if_exists="append"
+        )
+
+
+@asset(deps=["letterboxd_popular_films"])
+def letterboxd_film_details(database: DuckDBResource):
+    """Details found on the film page on Letterboxd.
+
+    1. Get subset of films that do not already exist in the details table
+    2. Scrape film details from Letterbox
+    3. Insert new entries into the Duckdb table
+    """
+    with database.get_connection() as conn:
+        results = conn.execute(
+            f"""
+            select
+                film_id,
+                film_slug,
+                link
+            from {DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS}
+            where snapshot_ts = (
+                select max(snapshot_ts) from {DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS}
+            )
+            """
+        ).fetchall()
+
+    all_film_details = []
+
+    for film_id, film_slug, link in results:
+        details = {}
+
+        details["film_id"] = film_id
+        details["film_slug"] = film_slug
+
+        url = f"https://letterboxd.com{link}"
+
+        response = requests.get(url, headers=LETTERBOXD_REQUEST_HEADERS)
+
+        assert response.status_code == 200
+
+        tree = html.fromstring(response.content)
+
+        # description / title / etc
+
+        title = tree.xpath("//h1[contains(@class, 'headline-1')]/text()")
+        details["title"] = title[0] if title else ""
+
+        synopsis = tree.xpath("//div[contains(@class, 'review')]/h4/text()")
+        details["synopsis"] = synopsis[0] if synopsis else ""
+
+        description = tree.xpath("//div[contains(@class, 'review')]/div/p/text()")
+        details["description"] = description[0] if description else ""
+
+        # External links to IMDB / TMDB
+        details["external_links"] = tree.xpath(
+            "//p[contains(@class, 'text-footer')]/a/@href"
+        )
+
+        details["genre_links"] = tree.xpath("//div[@id='tab-genres']/div/p/a/@href")
+        details["genre_names"] = tree.xpath("//div[@id='tab-genres']/div/p/a/text()")
+
+        cast_details = {
+            "name": tree.xpath('//div[contains(@class, "cast-list")]/p/a/text()'),
+            "href": tree.xpath('//div[contains(@class, "cast-list")]/p/a/@href'),
+            "title": tree.xpath('//div[contains(@class, "cast-list")]/p/a/@title'),
+        }
+        details["cast_details"] = cast_details
+
+        # Stats are retrieved from a separate URL appending `/stats/`
+
+        url = f"https://letterboxd.com/esi{link}stats/"
+
+        response = requests.get(url, headers=LETTERBOXD_REQUEST_HEADERS)
+
+        assert response.status_code == 200
+
+        tree = html.fromstring(response.content)
+
+        tree.xpath("//li[contains(@class, 'stat')]/a/@title")
+
+        tree.xpath("//li[contains(@class, 'stat')]/@class")
+
+        stats = tree.xpath("//li[contains(@class, 'stat')]/a/text()")
+
+        if len(stats) == 4:
+            details["stats"] = {
+                "watches": stats[0],
+                "lists": stats[1],
+                "likes": stats[2],
+                "top250": stats[3],
+            }
+
+        all_film_details.append(details)
+
+    df = pd.DataFrame(all_film_details)
+    df["snapshot_ts"] = pd.Timestamp.now()
+
+    with database.get_connection() as conn:
+        df.to_sql(
+            DUCKDB_TABLE_LETTERBOXD_FILMS_DETAILS, conn, index=False, if_exists="append"
+        )
