@@ -3,12 +3,19 @@
 The Letterboxd API (https://letterboxd.com/api-beta/) is currently in private beta,
 therefore, we will have to scrape the website the ol' fashioned way.
 
-TODO
+Todo Items
     - https://letterboxd.com/csi/film/parasite-2019/rating-histogram/
     - explore using a requests.Session resource
     - only scrape film details for films not existing in details table
     - better handling of request timeouts or failures (though haven't none have occurred so far)
     - write structs / lists to duckdb (eg. stats is currently varchar)
+
+
+Thoughts
+
+    - Collect full movie transcripts
+    - Summarize transcripts into TLDRs
+    - Feed website tldw.com
 
 """
 import pandas as pd
@@ -32,7 +39,6 @@ LETTERBOXD_REQUEST_HEADERS = {
     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
     "X-Requested-With": "XMLHttpRequest",
 }
-
 
 DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS = "letterboxd_popular_films"
 DUCKDB_TABLE_LETTERBOXD_FILMS_DETAILS = "letterboxd_film_details"
@@ -158,6 +164,9 @@ def letterboxd_film_details(database: DuckDBResource):
 
         description = tree.xpath("//div[contains(@class, 'review')]/div/p/text()")
         details["description"] = description[0] if description else ""
+
+        release_date = tree.xpath("//small[@class='number']/a/text()")
+        details["release_date"] = release_date[0] if release_date else ""
 
         # External links to IMDB / TMDB
         details["external_links"] = tree.xpath(
