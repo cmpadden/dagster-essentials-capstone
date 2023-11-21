@@ -3,7 +3,6 @@
 import os
 import re
 import zipfile
-from urllib import parse
 
 import requests
 from dagster import asset
@@ -17,7 +16,6 @@ OPENSUBTITLES_SEARCH_URL_BASE = "https://www.opensubtitles.org/en/search/imdbid-
 
 @asset(deps=["letterboxd_film_details"])
 def film_open_subtitles_raw(database: DuckDBResource):
-
     with database.get_connection() as conn:
         results = conn.execute(
             f"""
@@ -39,12 +37,13 @@ def film_open_subtitles_raw(database: DuckDBResource):
         if os.path.exists(zip_file_target) and os.path.exists(zip_decompressed_target):
             continue
 
-        # It is possible to search opensubtitles using the IMDB ID
+        # It is possible to search opensubtitles using the IMDB ID extracted from the
+        # Letterboxd external links URL.
         imdb_id = re.findall(r"\/tt(\d+)\/", external_links)
 
-        url = f"https://www.opensubtitles.org/en/search/imdbid-{imdb_id}/sublanguageid-eng"
-
-        response = requests.get(url)
+        response = requests.get(
+            f"https://www.opensubtitles.org/en/search/imdbid-{imdb_id}/sublanguageid-eng"
+        )
 
         assert response.status_code == 200
 
@@ -52,15 +51,24 @@ def film_open_subtitles_raw(database: DuckDBResource):
 
         table_hrefs = tree.xpath("//table[@id='search_results']/tbody/tr/td/a/@href")
 
-        tree.xpath("//table[@id='search_results']")
-
         subtitle_hrefs = [h for h in table_hrefs if "/subtitleserve/" in h]
 
         assert len(subtitle_hrefs) > 0
 
-        target_subtitle_href = subtitle_hrefs[0]
+        # On occasion, the opensubtitle srt download will _not_ be a zip file, resulting
+        # in the error:
+        #
+        #     zipfile.BadZipFile
+        #
+        # This is likely due to some form of throttling, or request error, as the result
+        # is instead HTML. Need to make this more robust.
+        #
+        # The first "potential" fix was adding `allow_redirects=True`, but validation
+        # still needs to be done for multi-part ZIP files.
 
-        response = requests.get(f"https://www.opensubtitles.org{target_subtitle_href}")
+        response = requests.get(
+            f"https://www.opensubtitles.org{subtitle_hrefs[0]}", allow_redirects=True
+        )
 
         with open(zip_file_target, "wb") as f:
             f.write(response.content)
