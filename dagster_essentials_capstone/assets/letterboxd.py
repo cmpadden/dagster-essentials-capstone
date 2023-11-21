@@ -24,6 +24,9 @@ from dagster import asset
 from dagster_duckdb import DuckDBResource
 from lxml import html
 
+from ..constants import (DUCKDB_TABLE_LETTERBOXD_FILMS_DETAILS,
+                         DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS)
+
 # The landing page for popular films on Letterbox (letterboxd.com/films/popular/) is
 # dynamically loaded. By inspecting the network tab, we can see that the content is
 # loaded from an `/ajax/` route; we can hit this directly to get the list of films.
@@ -39,9 +42,6 @@ LETTERBOXD_REQUEST_HEADERS = {
     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
     "X-Requested-With": "XMLHttpRequest",
 }
-
-DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS = "letterboxd_popular_films"
-DUCKDB_TABLE_LETTERBOXD_FILMS_DETAILS = "letterboxd_film_details"
 
 
 @asset

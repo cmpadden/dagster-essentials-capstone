@@ -1,0 +1,2 @@
+DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS = "letterboxd_popular_films"
+DUCKDB_TABLE_LETTERBOXD_FILMS_DETAILS = "letterboxd_film_details"
