@@ -111,9 +111,25 @@ def letterboxd_popular_films(database: DuckDBResource):
     df["snapshot_ts"] = pd.Timestamp.now()
 
     with database.get_connection() as conn:
-        df.to_sql(
-            DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS, conn, index=False, if_exists="append"
-        )
+
+        # NOTE: I was unable to get correctly inferred datatypes when writing the Pandas
+        # dataframe directly to DuckDB via `df.to_sql`, so a `create` statement had to
+        # be run beforehand.
+        conn.execute(f"""
+        create table if not exists {DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS} (
+            film_id varchar,
+            film_slug varchar,
+            link varchar,
+            average_rating  decimal(4,2),
+            poster_url varchar,
+            poster_image_url varchar,
+            snapshot_ts timestamp
+        );
+        """)
+
+        conn.execute(f"""
+        insert into {DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS} select * from df;
+        """)
 
 
 @asset(deps=["letterboxd_popular_films"])
