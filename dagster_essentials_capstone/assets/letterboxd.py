@@ -4,11 +4,12 @@ The Letterboxd API (https://letterboxd.com/api-beta/) is currently in private be
 therefore, we will have to scrape the website the ol' fashioned way.
 
 Todo Items
-    - https://letterboxd.com/csi/film/parasite-2019/rating-histogram/
-    - explore using a requests.Session resource
-    - only scrape film details for films not existing in details table
-    - better handling of request timeouts or failures (though haven't none have occurred so far)
-    - write structs / lists to duckdb (eg. stats is currently varchar)
+    - [ ] https://letterboxd.com/csi/film/parasite-2019/rating-histogram/
+    - [ ] explore using a requests.Session resource
+    - [ ] only scrape film details for films not existing in details table
+    - [ ] better handling of request timeouts or failures (though haven't none have occurred so far)
+    - [x] write structs / lists to duckdb (eg. stats is currently varchar)
+    - [ ] Refactor HTML parsing code into utility methods that take xpaths
 
 
 Thoughts
@@ -111,11 +112,11 @@ def letterboxd_popular_films(database: DuckDBResource):
     df["snapshot_ts"] = pd.Timestamp.now()
 
     with database.get_connection() as conn:
-
         # NOTE: I was unable to get correctly inferred datatypes when writing the Pandas
         # dataframe directly to DuckDB via `df.to_sql`, so a `create` statement had to
         # be run beforehand.
-        conn.execute(f"""
+        conn.execute(
+            f"""
         create table if not exists {DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS} (
             film_id varchar,
             film_slug varchar,
@@ -125,11 +126,15 @@ def letterboxd_popular_films(database: DuckDBResource):
             poster_image_url varchar,
             snapshot_ts timestamp
         );
-        """)
+        """
+        )
 
-        conn.execute(f"""
-        insert into {DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS} select * from df;
-        """)
+        conn.execute(
+            f"""
+        insert into {DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS}
+        select * from df;
+        """
+        )
 
 
 @asset(deps=["letterboxd_popular_films"])
@@ -209,10 +214,6 @@ def letterboxd_film_details(database: DuckDBResource):
 
         tree = html.fromstring(response.content)
 
-        tree.xpath("//li[contains(@class, 'stat')]/a/@title")
-
-        tree.xpath("//li[contains(@class, 'stat')]/@class")
-
         stats = tree.xpath("//li[contains(@class, 'stat')]/a/text()")
 
         if len(stats) == 4:
@@ -226,9 +227,34 @@ def letterboxd_film_details(database: DuckDBResource):
         all_film_details.append(details)
 
     df = pd.DataFrame(all_film_details)
+
     df["snapshot_ts"] = pd.Timestamp.now()
 
     with database.get_connection() as conn:
+        conn.execute(
+            f"""
+        create table if not exists {DUCKDB_TABLE_LETTERBOXD_FILMS_DETAILS} (
+            film_id        VARCHAR,
+            film_slug      VARCHAR,
+            title          VARCHAR,
+            synopsis       VARCHAR,
+            description    VARCHAR,
+            release_date   VARCHAR,
+            external_links VARCHAR[],
+            genre_links    VARCHAR[],
+            genre_names    VARCHAR[],
+            cast_details   STRUCT(name VARCHAR[], href VARCHAR[], title VARCHAR[]),
+            stats          STRUCT(watches VARCHAR, lists VARCHAR, likes VARCHAR, top250 VARCHAR),
+            snapshot_ts    TIMESTAMP
+        );
+        """
+        )
+
+        # When using `insert into ... from df` the following error was being thrown:
+        #
+        #     duckdb.duckdb.InvalidInputException: Invalid Input Error: Unsupported: decode ready legacy string
+        #
+        # For this reason, `df.to_sql` was utilised.
         df.to_sql(
             DUCKDB_TABLE_LETTERBOXD_FILMS_DETAILS, conn, index=False, if_exists="append"
         )
