@@ -9,6 +9,11 @@ setup(
         "dagster-duckdb",
         "requests",
         "pandas",
+        "langchain",
+        "tiktoken",
+        "openai",
+        "tiktoken",
+        "pysrt",
     ],
     extras_require={"dev": ["dagster-webserver", "pytest", "ruff", "isort"]},
 )

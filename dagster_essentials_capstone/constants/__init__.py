@@ -1,2 +1,3 @@
 DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS = "letterboxd_popular_films"
 DUCKDB_TABLE_LETTERBOXD_FILMS_DETAILS = "letterboxd_film_details"
+DUCKDB_TABLE_OPENAI_SUMMARY = "film_metric_openai_summary"
