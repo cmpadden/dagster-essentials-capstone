@@ -7,6 +7,28 @@ References
     - https://python.langchain.com/docs/modules/data_connection/document_transformers/text_splitters/split_by_token
     - https://python.langchain.com/docs/modules/model_io/llms/token_usage_tracking
 
+Next steps:
+
+    - Determine which assets are needed by website (eg. fetch images)
+    - Fix:
+
+Notes
+
+    If you encounter the following error when using SRTLoader, it is possible that the
+    subtitles are encoded in something like ISO-8859. While `autodetect_encoding` is a
+    parameter of `TextLoader`, it is not yet available in `SRTLoader`; this would be a
+    nice enhancement.
+
+        UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe7 in position 12: invalid
+        continuation byte
+
+    A temporary workaround, that should be integrated into the pipeline itself, is to
+    use the `iconv` command:
+
+         iconv -f ISO-8859-1 -t UTF-8 input.txt > output.txt
+
+
+
 """
 import os
 
@@ -33,20 +55,15 @@ def openai_film_summary(database: DuckDBResource):
             select
               film_slug
             from {DUCKDB_TABLE_LETTERBOXD_FILMS_DETAILS}
-            """
-        ).fetchall()
-        query_results_existing = conn.execute(
-            f"""\
-            select
-              film_slug
-            from {DUCKDB_TABLE_OPENAI_SUMMARY}
+            where film_slug not in (
+                select
+                  film_slug
+                from {DUCKDB_TABLE_OPENAI_SUMMARY}
+            )
             """
         ).fetchall()
 
-    # Subset of films that require summarization
-    films_to_summarize = list(set(query_results) - set(query_results_existing))
-
-    for row in films_to_summarize:
+    for row in query_results:
         film_slug = row[0]
 
         srts = [
