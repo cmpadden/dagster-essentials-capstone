@@ -20,6 +20,7 @@ Thoughts
 
 """
 import os
+
 import pandas as pd
 import requests
 from dagster import asset
@@ -260,11 +261,9 @@ def letterboxd_film_details(database: DuckDBResource):
             DUCKDB_TABLE_LETTERBOXD_FILMS_DETAILS, conn, index=False, if_exists="append"
         )
 
-@asset(
-    deps=["letterboxd_popular_films"]
-)
-def letterboxd_poster_image(database: DuckDBResource):
 
+@asset(deps=["letterboxd_popular_films"])
+def letterboxd_poster_image(database: DuckDBResource):
     with database.get_connection() as conn:
         results = conn.execute(
             f"""
@@ -276,7 +275,6 @@ def letterboxd_poster_image(database: DuckDBResource):
             )
             """
         ).fetchall()
-
 
     for row in results:
         film_slug = row[0]
@@ -293,7 +291,9 @@ def letterboxd_poster_image(database: DuckDBResource):
         assert response.status_code == 200
 
         tree = html.fromstring(response.content)
-        img_urls = [src for src in tree.xpath("//img/@src") if '/film-poster/' in src]
+        img_urls = [
+            src for src in tree.xpath("//img/@src") if "empty-poster" not in src
+        ]
         assert len(img_urls) == 1
 
         response = requests.get(img_urls[0], LETTERBOXD_REQUEST_HEADERS)
@@ -301,8 +301,3 @@ def letterboxd_poster_image(database: DuckDBResource):
 
         with open(destination_path, "wb") as f:
             f.write(response.content)
-
-
-
-
-
