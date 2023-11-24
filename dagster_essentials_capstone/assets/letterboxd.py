@@ -19,6 +19,7 @@ Thoughts
     - Feed website tldw.com
 
 """
+import os
 import pandas as pd
 import requests
 from dagster import asset
@@ -258,3 +259,50 @@ def letterboxd_film_details(database: DuckDBResource):
         df.to_sql(
             DUCKDB_TABLE_LETTERBOXD_FILMS_DETAILS, conn, index=False, if_exists="append"
         )
+
+@asset(
+    deps=["letterboxd_popular_films"]
+)
+def letterboxd_poster_image(database: DuckDBResource):
+
+    with database.get_connection() as conn:
+        results = conn.execute(
+            f"""
+            select
+                film_slug
+            from {DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS}
+            where snapshot_ts = (
+                select max(snapshot_ts) from {DUCKDB_TABLE_LETTERBOXD_POPULAR_FILMS}
+            )
+            """
+        ).fetchall()
+
+
+    for row in results:
+        film_slug = row[0]
+        destination_path = f"data/staging/images/posters/{film_slug}.jpg"
+
+        # only retrieve files that don't already exist
+        if os.path.exists(destination_path):
+            continue
+
+        response = requests.get(
+            f"https://letterboxd.com/ajax/poster/film/{film_slug}/std/500x750/",
+            LETTERBOXD_REQUEST_HEADERS,
+        )
+        assert response.status_code == 200
+
+        tree = html.fromstring(response.content)
+        img_urls = [src for src in tree.xpath("//img/@src") if '/film-poster/' in src]
+        assert len(img_urls) == 1
+
+        response = requests.get(img_urls[0], LETTERBOXD_REQUEST_HEADERS)
+        assert response.status_code == 200
+
+        with open(destination_path, "wb") as f:
+            f.write(response.content)
+
+
+
+
+
