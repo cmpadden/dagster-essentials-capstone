@@ -16,6 +16,8 @@ OPENSUBTITLES_SEARCH_URL_BASE = "https://www.opensubtitles.org/en/search/imdbid-
 
 @asset(deps=["letterboxd_film_details"])
 def film_open_subtitles_raw(database: DuckDBResource):
+    """ English subtitle files in SRT format.
+    """
     with database.get_connection() as conn:
         results = conn.execute(
             f"""

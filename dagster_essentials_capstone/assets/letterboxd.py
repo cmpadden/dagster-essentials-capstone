@@ -4,19 +4,9 @@ The Letterboxd API (https://letterboxd.com/api-beta/) is currently in private be
 therefore, we will have to scrape the website the ol' fashioned way.
 
 Todo Items
-    - [ ] https://letterboxd.com/csi/film/parasite-2019/rating-histogram/
     - [ ] explore using a requests.Session resource
-    - [ ] only scrape film details for films not existing in details table
     - [ ] better handling of request timeouts or failures (though haven't none have occurred so far)
-    - [x] write structs / lists to duckdb (eg. stats is currently varchar)
     - [ ] Refactor HTML parsing code into utility methods that take xpaths
-
-
-Thoughts
-
-    - Collect full movie transcripts
-    - Summarize transcripts into TLDRs
-    - Feed website tldw.com
 
 """
 import os
@@ -49,7 +39,7 @@ LETTERBOXD_REQUEST_HEADERS = {
 
 @asset
 def letterboxd_popular_films(database: DuckDBResource):
-    """First `n` pages of popular films scraped from Letterboxd."""
+    """First page of popular films scraped from Letterboxd."""
 
     response = requests.get(
         LETTERBOXD_POPULAR_FILMS_URL, headers=LETTERBOXD_REQUEST_HEADERS
@@ -264,6 +254,8 @@ def letterboxd_film_details(database: DuckDBResource):
 
 @asset(deps=["letterboxd_popular_films"])
 def letterboxd_poster_image(database: DuckDBResource):
+    """Poster images downloaded as JPGs.
+    """
     with database.get_connection() as conn:
         results = conn.execute(
             f"""

@@ -9,6 +9,8 @@ from dagster_essentials_capstone.constants import (
 
 @asset(deps=["openai_film_summary", "letterboxd_poster_image"])
 def film_details_json_dump(database: DuckDBResource):
+    """Exported JSON data for use in website.
+    """
     with database.get_connection() as conn:
         conn.execute(
             f"""

@@ -49,6 +49,8 @@ from dagster_essentials_capstone.constants import (
 
 @asset(deps=["film_open_subtitles_raw"])
 def openai_film_summary(database: DuckDBResource):
+    """ Film summary based on subtitles fed into an LLM.
+    """
     with database.get_connection() as conn:
         query_results = conn.execute(
             f"""\
