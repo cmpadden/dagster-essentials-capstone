@@ -1,6 +1,7 @@
-# dagster_essentials_capstone
+# Dagster Essentials Capstone - Movie Summaries
 
-This is a [Dagster](https://dagster.io/) project scaffolded with [`dagster project scaffold`](https://docs.dagster.io/getting-started/create-new-project).
+Collect movie metadata from Letterbox and OpenSubtitles, and generate a full movie
+summarization with the power of LLMs and LangChain. 
 
 ## Getting started
 
